@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenCart Dynamic API - Documentation</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #fafafa;
+            color: #3b4151;
+        }
+
+        /* Header Section */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 30px;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-version {
+            background: rgba(255,255,255,0.2);
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 13px;
+            font-weight: normal;
+        }
+
+        /* API Key Section */
+        .api-key-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255,255,255,0.15);
+            padding: 12px 18px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            margin-top: 15px;
+        }
+
+        .api-key-section input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 6px;
+            font-size: 14px;
+            background: rgba(255,255,255,0.95);
+            transition: all 0.3s;
+        }
+
+        .api-key-section input:focus {
+            outline: none;
+            border-color: white;
+            background: white;
+        }
+
+        .api-key-section button {
+            padding: 10px 25px;
+            background: white;
+            color: #667eea;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .api-key-section button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .status-badge {
+            padding: 6px 14px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-badge.success {
+            background: #4caf50;
+            color: white;
+        }
+
+        .status-badge.loading {
+            background: #ff9800;
+            color: white;
+        }
+
+        .status-badge.error {
+            background: #f44336;
+            color: white;
+        }
+
+        /* Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 25px 30px;
+        }
+
+        /* Stats Section */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.12);
+        }
+
+        .stat-icon {
+            width: 55px;
+            height: 55px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .stat-icon.blue { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .stat-icon.green { background: linear-gradient(135deg, #4caf50 0%, #45a049 100%); color: white; }
+        .stat-icon.orange { background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%); color: white; }
+
+        .stat-info h3 {
+            font-size: 28px;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-info p {
+            color: #999;
+            font-size: 13px;
+        }
+
+        /* Search Bar */
+        .search-bar {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .search-bar input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .search-bar input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .filter-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .filter-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        /* API Group */
+        .api-group {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+
+        .api-group-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 18px 22px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.3s;
+        }
+
+        .api-group-header:hover {
+            background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%);
+        }
+
+        .api-group-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .api-group-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+        }
+
+        .api-group-toggle {
+            font-size: 20px;
+            transition: transform 0.3s;
+        }
+
+        .api-group.collapsed .api-group-toggle {
+            transform: rotate(-90deg);
+        }
+
+        .api-group-body {
+            max-height: 10000px;
+            overflow: hidden;
+            transition: max-height 0.5s ease-out;
+        }
+
+        .api-group.collapsed .api-group-body {
+            max-height: 0;
+        }
+
+        /* Endpoint */
+        .endpoint {
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .endpoint:last-child {
+            border-bottom: none;
+        }
+
+        .endpoint-header {
+            padding: 16px 22px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s;
+        }
+
+        .endpoint-header:hover {
+            background: #f8f9fa;
+        }
+
+        .method-badge {
+            padding: 5px 12px;
+            border-radius: 5px;
+            font-size: 11px;
+            font-weight: 700;
+            min-width: 65px;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .method-badge.get {
+            background: #61affe;
+            color: white;
+        }
+
+        .method-badge.post {
+            background: #49cc90;
+            color: white;
+        }
+
+        .endpoint-path {
+            flex: 1;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #3b4151;
+        }
+
+        .endpoint-description {
+            color: #999;
+            font-size: 13px;
+        }
+
+        .expand-icon {
+            color: #999;
+            transition: transform 0.3s;
+        }
+
+        .endpoint.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .endpoint-details {
+            padding: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.4s ease-out;
+            background: #fafafa;
+        }
+
+        .endpoint.expanded .endpoint-details {
+            max-height: 3000px;
+            padding: 20px 22px;
+        }
+
+        /* Try It Out Section */
+        .try-it-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #667eea;
+            margin-top: 15px;
+        }
+
+        .try-it-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 18px;
+        }
+
+        .try-it-header h4 {
+            font-size: 16px;
+            color: #667eea;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .execute-btn {
+            padding: 10px 25px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .execute-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .execute-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .param-section {
+            margin-bottom: 18px;
+        }
+
+        .param-section h5 {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .param-group {
+            display: grid;
+            gap: 12px;
+        }
+
+        .param-input {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .param-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .param-required {
+            color: #f44336;
+            font-size: 11px;
+        }
+
+        .param-input input,
+        .param-input textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s;
+        }
+
+        .param-input input:focus,
+        .param-input textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .param-input textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        /* Response Section */
+        .response-section {
+            margin-top: 18px;
+        }
+
+        .response-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .response-header h5 {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .response-status {
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .response-status.success {
+            background: #4caf50;
+            color: white;
+        }
+
+        .response-status.error {
+            background: #f44336;
+            color: white;
+        }
+
+        .response-body {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 18px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            max-height: 500px;
+            overflow-y: auto;
+            line-height: 1.6;
+            position: relative;
+        }
+
+        .copy-response-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #48bb78;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.3s;
+        }
+
+        .copy-response-btn:hover {
+            background: #38a169;
+        }
+
+        /* JSON Syntax Highlighting */
+        .json-key {
+            color: #79c0ff;
+        }
+
+        .json-string {
+            color: #a5d6ff;
+        }
+
+        .json-number {
+            color: #ffa657;
+        }
+
+        .json-boolean {
+            color: #ff7b72;
+        }
+
+        .json-null {
+            color: #8b949e;
+        }
+
+        /* Loading Spinner */
+        .loading-spinner {
+            text-align: center;
+            padding: 60px 20px;
+            color: #667eea;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .search-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-buttons {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <h1>
+                <i class="fas fa-rocket"></i>
+                OpenCart Dynamic API
+                <span class="header-version">v2.0</span>
+            </h1>
+            
+            <div class="api-key-section">
+                <i class="fas fa-key"></i>
+                <input type="text" id="apiKey" placeholder="Enter your API Key to explore endpoints..." />
+                <button onclick="loadApiSpec()">
+                    <i class="fas fa-sync-alt"></i> Load API
+                </button>
+                <span id="apiStatus"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Container -->
+    <div class="container">
+        <!-- Stats Section -->
+        <div class="stats" id="statsSection" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-icon blue">
+                    <i class="fas fa-cube"></i>
+                </div>
+                <div class="stat-info">
+                    <h3 id="totalModules">0</h3>
+                    <p>Total Modules</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon green">
+                    <i class="fas fa-code"></i>
+                </div>
+                <div class="stat-info">
+                    <h3 id="totalEndpoints">0</h3>
+                    <p>Total Endpoints</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon orange">
+                    <i class="fas fa-bolt"></i>
+                </div>
+                <div class="stat-info">
+                    <h3 id="totalMethods">0</h3>
+                    <p>Available Methods</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="search-bar" id="searchBar" style="display: none;">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchInput" placeholder="Search endpoints by name, path, or description..." oninput="filterEndpoints()">
+            
+            <div class="filter-buttons">
+                <button class="filter-btn active" onclick="filterByMethod('all')">
+                    <i class="fas fa-list"></i> All
+                </button>
+                <button class="filter-btn" onclick="filterByMethod('get')">
+                    <i class="fas fa-download"></i> GET
+                </button>
+                <button class="filter-btn" onclick="filterByMethod('post')">
+                    <i class="fas fa-upload"></i> POST
+                </button>
+            </div>
+        </div>
+
+        <!-- API Groups Container -->
+        <div id="apiContainer">
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <i class="fas fa-rocket"></i>
+                </div>
+                <h2 style="color: #999; margin-bottom: 10px;">Welcome to OpenCart Dynamic API</h2>
+                <p style="color: #bbb;">Enter your API Key above to load and explore all available endpoints</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let apiSpec = null;
+        let apiKey = localStorage.getItem('opencart_api_key') || '';
+        
+        // 🆕 SMART BASE URL DETECTION - Handles all OpenCart folder structures
+        function detectBaseUrl() {
+            let origin = window.location.origin;
+            let pathname = window.location.pathname;
+
+            // حذف نام فایل (docs.html, index.php, etc.)
+            let dirPath = pathname.substring(0, pathname.lastIndexOf('/'));
+
+            // ✅ اگر مسیر با /catalog تموم شد، یک سطح بالاتر برو
+            if (dirPath.endsWith('/catalog')) {
+                dirPath = dirPath.substring(0, dirPath.lastIndexOf('/catalog'));
+            }
+            // ✅ اگر داخل /catalog/xxx هستیم، به root برگرد
+            else if (dirPath.includes('/catalog/')) {
+                let catalogIndex = dirPath.indexOf('/catalog');
+                dirPath = dirPath.substring(0, catalogIndex);
+            }
+
+            // ✅ اگر در admin پوشه بودیم، به root برگرد
+            if (dirPath.includes('/admin')) {
+                let adminIndex = dirPath.indexOf('/admin');
+                dirPath = dirPath.substring(0, adminIndex);
+            }
+
+            // اگر خالی شد یا فقط / بود
+            if (dirPath === '' || dirPath === '/') {
+                dirPath = '';
+            }
+
+            return origin + dirPath;
+        }
+
+        let baseUrl = detectBaseUrl();
+        console.log('🔍 Detected Base URL:', baseUrl);
+
+
+        // Load saved API key
+        document.getElementById('apiKey').value = apiKey;
+        if (apiKey) {
+            // Auto-load if API key exists
+            // loadApiSpec(); // Uncomment to auto-load on page load
+        }
+
+        // Load API Specification
+        async function loadApiSpec() {
+            apiKey = document.getElementById('apiKey').value.trim();
+            
+            if (!apiKey) {
+                showStatus('error', 'Please enter an API Key');
+                return;
+            }
+
+            localStorage.setItem('opencart_api_key', apiKey);
+            showStatus('loading', 'Loading API specification...');
+
+            try {
+                const response = await fetch(`${baseUrl}/index.php?route=api/swagger&format=json&api_key=${apiKey}`);
+                
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status + ' - Check if API route exists');
+                }
+
+                const text = await response.text();
+                apiSpec = JSON.parse(text);
+
+                showStatus('success', 'API Loaded Successfully');
+                renderApiSpec();
+
+            } catch (error) {
+                showStatus('error', 'Failed: ' + error.message);
+                console.error('Error:', error);
+                
+                document.getElementById('apiContainer').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                        <h2 style="color: #f44336;">Error Loading API</h2>
+                        <p style="color: #999; margin-top: 10px;">${error.message}</p>
+                        <p style="color: #999; margin-top: 10px;">
+                            <strong>Troubleshooting:</strong><br>
+                            1. Verify API key is valid<br>
+                            2. Check if <code>api/swagger</code> route exists<br>
+                            3. Ensure <code>swagger.php</code> is in <code>catalog/controller/api/</code>
+                        </p>
+                    </div>
+                `;
+            }
+        }
+
+        // Show status
+        function showStatus(type, message) {
+            const statusEl = document.getElementById('apiStatus');
+            
+            if (type === 'loading') {
+                statusEl.innerHTML = '<span class="status-badge loading"><i class="fas fa-spinner fa-spin"></i> Loading...</span>';
+            } else {
+                statusEl.innerHTML = `<span class="status-badge ${type}">${message}</span>`;
+                
+                if (type !== 'error') {
+                    setTimeout(() => {
+                        statusEl.innerHTML = '';
+                    }, 3000);
+                }
+            }
+        }
+
+        // Render API Specification
+        function renderApiSpec() {
+            if (!apiSpec || !apiSpec.paths) {
+                return;
+            }
+
+            // Calculate stats
+            const stats = calculateStats(apiSpec);
+            updateStats(stats);
+
+            // Show search bar and stats
+            document.getElementById('searchBar').style.display = 'flex';
+            document.getElementById('statsSection').style.display = 'grid';
+
+            // Group paths by tags
+            const groupedPaths = groupPathsByTags(apiSpec);
+
+            // Render API groups
+            const container = document.getElementById('apiContainer');
+            container.innerHTML = '';
+
+            Object.keys(groupedPaths).forEach(tag => {
+                const groupHtml = renderApiGroup(tag, groupedPaths[tag]);
+                container.insertAdjacentHTML('beforeend', groupHtml);
+            });
+        }
+
+        // Calculate statistics
+        function calculateStats(spec) {
+            let totalEndpoints = 0;
+            let totalMethods = 0;
+            const modules = new Set();
+
+            Object.entries(spec.paths).forEach(([path, pathData]) => {
+                Object.keys(pathData).forEach(method => {
+                    if (['get', 'post', 'put', 'delete'].includes(method)) {
+                        totalEndpoints++;
+                        totalMethods++;
+                        
+                        // Extract module from path
+                        const moduleMatch = path.match(/module=([^&]+)/);
+                        if (moduleMatch) {
+                            modules.add(moduleMatch[1]);
+                        }
+                    }
+                });
+            });
+
+            return {
+                totalModules: modules.size,
+                totalEndpoints,
+                totalMethods
+            };
+        }
+
+        // Update stats display
+        function updateStats(stats) {
+            document.getElementById('totalModules').textContent = stats.totalModules;
+            document.getElementById('totalEndpoints').textContent = stats.totalEndpoints;
+            document.getElementById('totalMethods').textContent = stats.totalMethods;
+        }
+
+        // Group paths by tags
+        function groupPathsByTags(spec) {
+            const groups = {};
+
+            Object.entries(spec.paths).forEach(([path, methods]) => {
+                Object.entries(methods).forEach(([method, details]) => {
+                    if (!['get', 'post', 'put', 'delete'].includes(method)) {
+                        return;
+                    }
+
+                    const tag = details.tags && details.tags[0] ? details.tags[0] : 'Other';
+                    
+                    if (!groups[tag]) {
+                        groups[tag] = [];
+                    }
+
+                    groups[tag].push({
+                        path,
+                        method: method.toUpperCase(),
+                        details
+                    });
+                });
+            });
+
+            return groups;
+        }
+
+        // Render API group
+        function renderApiGroup(tag, endpoints) {
+            const groupId = 'group-' + tag.replace(/[^a-zA-Z0-9]/g, '-');
+            const endpointsHtml = endpoints.map(ep => renderEndpoint(ep)).join('');
+
+            return `
+                <div class="api-group collapsed" id="${groupId}" data-tag="${tag}">
+                    <div class="api-group-header" onclick="toggleGroup('${groupId}')">
+                        <div class="api-group-title">
+                            <i class="fas fa-folder"></i>
+                            ${tag}
+                            <span class="api-group-badge">${endpoints.length} endpoints</span>
+                        </div>
+                        <i class="fas fa-chevron-down api-group-toggle"></i>
+                    </div>
+                    <div class="api-group-body">
+                        ${endpointsHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render endpoint
+        function renderEndpoint(ep) {
+            const { path, method, details } = ep;
+            const endpointId = 'endpoint-' + Math.random().toString(36).substr(2, 9);
+
+            return `
+                <div class="endpoint" data-method="${method.toLowerCase()}" data-path="${path}" data-endpoint-id="${endpointId}">
+                    <div class="endpoint-header" onclick="toggleEndpoint('${endpointId}')">
+                        <span class="method-badge ${method.toLowerCase()}">${method}</span>
+                        <span class="endpoint-path">${path}</span>
+                        <span class="endpoint-description">${details.summary || details.description || ''}</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details" id="${endpointId}">
+                        ${renderEndpointDetails(path, method, details, endpointId)}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render endpoint details
+        function renderEndpointDetails(path, method, details, endpointId) {
+            const parameters = details.parameters || [];
+            const hasBody = method === 'POST' && details.requestBody;
+
+            return `
+                <div class="try-it-section">
+                    <div class="try-it-header">
+                        <h4><i class="fas fa-play-circle"></i> Try It Out</h4>
+                        <button class="execute-btn" onclick="executeRequest('${endpointId}', '${path}', '${method}')">
+                            <i class="fas fa-bolt"></i> Execute
+                        </button>
+                    </div>
+
+                    ${renderParameters(parameters, endpointId)}
+                    
+                    ${hasBody ? renderRequestBody(details.requestBody, endpointId) : ''}
+
+                    <div id="${endpointId}-response" class="response-section" style="display: none;">
+                        <div class="response-header">
+                            <h5>Response:</h5>
+                            <span id="${endpointId}-status"></span>
+                        </div>
+                        <div class="response-body" id="${endpointId}-body-response">
+                            <button class="copy-response-btn" onclick="copyResponse('${endpointId}')">
+                                <i class="fas fa-copy"></i> Copy
+                            </button>
+                            <pre id="${endpointId}-response-pre"></pre>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render parameters
+        function renderParameters(params, endpointId) {
+            if (!params || params.length === 0) {
+                return '';
+            }
+
+            const paramHtml = params.map(param => {
+                const isRequired = param.required ? '<span class="param-required">*</span>' : '';
+                const placeholder = param.example || param.schema?.example || '';
+                
+                return `
+                    <div class="param-input">
+                        <label class="param-label">
+                            <i class="fas fa-tag"></i>
+                            ${param.name} ${isRequired}
+                        </label>
+                        <input type="text" 
+                               id="${endpointId}-param-${param.name}" 
+                               placeholder="${placeholder}"
+                               value="${placeholder}"
+                               data-param-name="${param.name}">
+                        <small style="color: #999; font-size: 11px;">${param.description || ''}</small>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="param-section">
+                    <h5><i class="fas fa-sliders-h"></i> Parameters</h5>
+                    <div class="param-group">
+                        ${paramHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render request body
+        function renderRequestBody(requestBody, endpointId) {
+            const schema = requestBody.content?.['application/json']?.schema;
+            const example = schema?.example || schema || {};
+
+            return `
+                <div class="param-section">
+                    <h5><i class="fas fa-code"></i> Request Body (JSON)</h5>
+                    <div class="param-input">
+                        <textarea id="${endpointId}-body" placeholder="Enter JSON body...">${JSON.stringify(example, null, 2)}</textarea>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Toggle group
+        function toggleGroup(groupId) {
+            const group = document.getElementById(groupId);
+            group.classList.toggle('collapsed');
+        }
+
+        // Toggle endpoint
+        function toggleEndpoint(endpointId) {
+            const endpoint = document.querySelector(`[data-endpoint-id="${endpointId}"]`);
+            endpoint.classList.toggle('expanded');
+        }
+
+        // Execute API request
+        async function executeRequest(endpointId, path, method) {
+            const responseSection = document.getElementById(`${endpointId}-response`);
+            const statusEl = document.getElementById(`${endpointId}-status`);
+            const bodyEl = document.getElementById(`${endpointId}-response-pre`);
+            const executeBtn = event.target.closest('.execute-btn');
+            
+            responseSection.style.display = 'block';
+            statusEl.innerHTML = '<span class="response-status" style="background: #ff9800;"><i class="fas fa-spinner fa-spin"></i> Loading...</span>';
+            bodyEl.textContent = 'Executing request...';
+            executeBtn.disabled = true;
+
+            try {
+                // Build URL with parameters
+                let url = buildRequestUrl(path, endpointId);
+
+                // Get request body for POST
+                let body = null;
+                let headers = {
+                    'Content-Type': 'application/json'
+                };
+
+                if (method === 'POST') {
+                    const bodyInput = document.getElementById(`${endpointId}-body`);
+                    if (bodyInput && bodyInput.value.trim()) {
+                        try {
+                            body = bodyInput.value.trim();
+                            // Validate JSON
+                            JSON.parse(body);
+                        } catch (e) {
+                            throw new Error('Invalid JSON in request body: ' + e.message);
+                        }
+                    }
+                }
+
+                // Execute request
+                const startTime = Date.now();
+                const response = await fetch(url, {
+                    method: method,
+                    headers: headers,
+                    body: body
+                });
+                const endTime = Date.now();
+
+                const text = await response.text();
+                let result;
+                
+                try {
+                    result = JSON.parse(text);
+                } catch (e) {
+                    result = { raw_response: text };
+                }
+
+                // Show response
+                const statusClass = response.ok ? 'success' : 'error';
+                statusEl.innerHTML = `
+                    <span class="response-status ${statusClass}">
+                        ${response.status} ${response.statusText}
+                    </span>
+                    <span style="color: #999; font-size: 11px; margin-left: 10px;">
+                        <i class="fas fa-clock"></i> ${endTime - startTime}ms
+                    </span>
+                `;
+                
+                bodyEl.innerHTML = syntaxHighlight(JSON.stringify(result, null, 2));
+
+            } catch (error) {
+                statusEl.innerHTML = '<span class="response-status error"><i class="fas fa-exclamation-triangle"></i> Error</span>';
+                bodyEl.textContent = `Error: ${error.message}\n\nPlease check:\n1. API endpoint is correct\n2. Parameters are valid\n3. API key has proper permissions`;
+            } finally {
+                executeBtn.disabled = false;
+            }
+        }
+
+        // Build request URL with parameters
+        function buildRequestUrl(path, endpointId) {
+            let url = `${baseUrl}${path}`;
+            
+            // Replace api_key placeholder
+            if (!url.includes('api_key=')) {
+                url += (url.includes('?') ? '&' : '?') + 'api_key=' + apiKey;
+            } else {
+                url = url.replace('api_key=YOUR_KEY', 'api_key=' + apiKey);
+                url = url.replace('api_key=XXX', 'api_key=' + apiKey);
+            }
+
+            // Get all parameter inputs
+            const paramInputs = document.querySelectorAll(`[id^="${endpointId}-param-"]`);
+            paramInputs.forEach(input => {
+                const paramName = input.dataset.paramName;
+                const paramValue = input.value.trim();
+                
+                if (paramValue) {
+                    // Replace existing parameter or add new one
+                    if (url.includes(`${paramName}=`)) {
+                        url = url.replace(new RegExp(`${paramName}=[^&]*`), `${paramName}=${encodeURIComponent(paramValue)}`);
+                    } else {
+                        url += `&${paramName}=${encodeURIComponent(paramValue)}`;
+                    }
+                }
+            });
+
+            return url;
+        }
+
+        // Copy response to clipboard
+        function copyResponse(endpointId) {
+            const responseText = document.getElementById(`${endpointId}-response-pre`).textContent;
+            navigator.clipboard.writeText(responseText).then(() => {
+                const btn = event.target.closest('.copy-response-btn');
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                }, 2000);
+            });
+        }
+
+        // Filter endpoints by search
+        function filterEndpoints() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const endpoints = document.querySelectorAll('.endpoint');
+
+            endpoints.forEach(endpoint => {
+                const path = endpoint.dataset.path.toLowerCase();
+                const description = endpoint.querySelector('.endpoint-description').textContent.toLowerCase();
+                const visible = path.includes(searchTerm) || description.includes(searchTerm);
+                endpoint.style.display = visible ? 'block' : 'none';
+            });
+
+            // Hide empty groups
+            document.querySelectorAll('.api-group').forEach(group => {
+                const visibleEndpoints = group.querySelectorAll('.endpoint[style*="display: block"], .endpoint:not([style*="display"])');
+                group.style.display = visibleEndpoints.length > 0 ? 'block' : 'none';
+            });
+        }
+
+        // Filter by HTTP method
+        function filterByMethod(method) {
+            const buttons = document.querySelectorAll('.filter-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            const endpoints = document.querySelectorAll('.endpoint');
+            
+            endpoints.forEach(endpoint => {
+                if (method === 'all' || endpoint.dataset.method === method) {
+                    endpoint.style.display = 'block';
+                } else {
+                    endpoint.style.display = 'none';
+                }
+            });
+
+            // Hide empty groups
+            document.querySelectorAll('.api-group').forEach(group => {
+                const visibleEndpoints = group.querySelectorAll('.endpoint[style*="display: block"], .endpoint:not([style*="display"])');
+                group.style.display = visibleEndpoints.length > 0 ? 'block' : 'none';
+            });
+        }
+
+        // JSON Syntax Highlighting
+        function syntaxHighlight(json) {
+            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                var cls = 'json-number';
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) {
+                        cls = 'json-key';
+                    } else {
+                        cls = 'json-string';
+                    }
+                } else if (/true|false/.test(match)) {
+                    cls = 'json-boolean';
+                } else if (/null/.test(match)) {
+                    cls = 'json-null';
+                }
+                return '<span class="' + cls + '">' + match + '</span>';
+            });
+        }
+    </script>
+</body>
+</html>
