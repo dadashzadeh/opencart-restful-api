@@ -656,13 +656,68 @@ class ControllerApiDynamicCatalog extends ControllerApiBaseCatalog {
         
         // Get method parameters
         $params = $this->getMethodParams($method, null, null, $autoMerged);
-
-        // Execute method
-        $result = $this->executeMethod($controller, $method, $params);
-
+    
+        // 🆕 Start output buffering (for echo/print statements)
+        ob_start();
+        
+        try {
+            // 🔑 KEY FIX: Clear any existing response output before execution
+            if (is_object($controller->response) && method_exists($controller->response, 'setOutput')) {
+                $controller->response->setOutput('');
+            }
+            
+            // Execute method
+            $result = $this->executeMethod($controller, $method, $params);
+            
+            // 🆕 Get output buffer (for direct echo/print)
+            $bufferOutput = ob_get_clean();
+            
+            // 🔑 KEY FIX: Get response output (from $this->response->setOutput)
+            $responseOutput = '';
+            if (is_object($controller->response) && method_exists($controller->response, 'getOutput')) {
+                $responseOutput = $controller->response->getOutput();
+                
+                // 🧹 Clean response so it doesn't get sent automatically
+                if (method_exists($controller->response, 'setOutput')) {
+                    $controller->response->setOutput('');
+                }
+            }
+            
+            // 🆕 Combine all outputs
+            $totalOutput = trim($responseOutput . $bufferOutput);
+            
+            // 🆕 Build final result
+            if (!empty($totalOutput)) {
+                // ✅ We captured HTML output
+                $finalResult = [
+                    'type' => 'html',
+                    'content' => $totalOutput,
+                    'content_length' => strlen($totalOutput),
+                    'content_preview' => substr($totalOutput, 0, 200) . '...',
+                    'returned_value' => $result,
+                    'sources' => [
+                        'response_object' => !empty($responseOutput),
+                        'output_buffer' => !empty($bufferOutput),
+                        'response_length' => strlen($responseOutput),
+                        'buffer_length' => strlen($bufferOutput)
+                    ]
+                ];
+            } elseif ($result !== null) {
+                // Direct return value (rare in controllers)
+                $finalResult = $result;
+            } else {
+                // No output and no return
+                $finalResult = null;
+            }
+            
+        } catch (Exception $e) {
+            ob_end_clean();
+            throw $e;
+        }
+    
         $this->sendResponse([
             'success' => true,
-            'result' => $result,
+            'result' => $finalResult,
             'meta' => [
                 'api_type' => 'CATALOG (Frontend)',
                 'type' => 'catalog_controller',
@@ -672,6 +727,12 @@ class ControllerApiDynamicCatalog extends ControllerApiBaseCatalog {
                 'is_modified' => ($filePath != $this->catalogPath . 'controller/' . $module . '.php'),
                 'modification_type' => $this->modificationType,
                 'params_count' => count($params),
+                'output_captured' => !empty($totalOutput),
+                'output_method' => !empty($responseOutput) ? 'response_object' : (!empty($bufferOutput) ? 'output_buffer' : 'none'),
+                'response_methods_available' => [
+                    'has_getOutput' => is_object($controller->response) && method_exists($controller->response, 'getOutput'),
+                    'has_setOutput' => is_object($controller->response) && method_exists($controller->response, 'setOutput')
+                ],
                 'execution_time' => $this->getExecutionTime()
             ]
         ]);
