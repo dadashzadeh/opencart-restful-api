@@ -653,39 +653,39 @@ class ControllerApiDynamicCatalog extends ControllerApiBaseCatalog {
      */
     private function executeControllerMethod($module, $method, $controller, $filePath) {
         $autoMerged = false;
-        
+
         // Get method parameters
         $params = $this->getMethodParams($method, null, null, $autoMerged);
-    
+
         // 🆕 Start output buffering (for echo/print statements)
         ob_start();
-        
+
         try {
             // 🔑 KEY FIX: Clear any existing response output before execution
             if (is_object($controller->response) && method_exists($controller->response, 'setOutput')) {
                 $controller->response->setOutput('');
             }
-            
+
             // Execute method
             $result = $this->executeMethod($controller, $method, $params);
-            
+
             // 🆕 Get output buffer (for direct echo/print)
             $bufferOutput = ob_get_clean();
-            
+
             // 🔑 KEY FIX: Get response output (from $this->response->setOutput)
             $responseOutput = '';
             if (is_object($controller->response) && method_exists($controller->response, 'getOutput')) {
                 $responseOutput = $controller->response->getOutput();
-                
+
                 // 🧹 Clean response so it doesn't get sent automatically
                 if (method_exists($controller->response, 'setOutput')) {
                     $controller->response->setOutput('');
                 }
             }
-            
+
             // 🆕 Combine all outputs
             $totalOutput = trim($responseOutput . $bufferOutput);
-            
+
             // 🆕 Build final result
             if (!empty($totalOutput)) {
                 // ✅ We captured HTML output
@@ -693,7 +693,6 @@ class ControllerApiDynamicCatalog extends ControllerApiBaseCatalog {
                     'type' => 'html',
                     'content' => $totalOutput,
                     'content_length' => strlen($totalOutput),
-                    'content_preview' => substr($totalOutput, 0, 200) . '...',
                     'returned_value' => $result,
                     'sources' => [
                         'response_object' => !empty($responseOutput),
@@ -709,12 +708,12 @@ class ControllerApiDynamicCatalog extends ControllerApiBaseCatalog {
                 // No output and no return
                 $finalResult = null;
             }
-            
+
         } catch (Exception $e) {
             ob_end_clean();
             throw $e;
         }
-    
+
         $this->sendResponse([
             'success' => true,
             'result' => $finalResult,
