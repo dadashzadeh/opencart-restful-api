@@ -636,12 +636,15 @@ class ControllerApiDynamicAdmin extends ControllerApiBaseAdmin {
      * ⚡ Execute controller method
      */
     private function executeControllerMethod($module, $method, $controller, $filePath) {
+        // ✅ تعریف متغیر $autoMerged
+        $autoMerged = false;
+        
         // Get method parameters
         $params = $this->getMethodParams($method, null, null, $autoMerged);
-
+    
         // Execute method
         $result = $this->executeMethod($controller, $method, $params);
-
+    
         $this->sendResponse([
             'success' => true,
             'result' => $result,
@@ -652,10 +655,12 @@ class ControllerApiDynamicAdmin extends ControllerApiBaseAdmin {
                 'file_loaded' => $filePath,
                 'modification_type' => $this->modificationType,
                 'params_count' => count($params),
+                'auto_merged' => $autoMerged,  // ✅ اضافه شد
                 'execution_time' => $this->getExecutionTime()
             ]
         ]);
     }
+    
 
     /**
      * 📁 Scan directory for PHP files
@@ -740,9 +745,8 @@ class ControllerApiDynamicAdmin extends ControllerApiBaseAdmin {
         
         return $loaded;
     }
-
     /**
-     * 🎯 Get method parameters (with auto-merge for partial updates)
+     * 🎯 Get method parameters (Enhanced with Smart Defaults)
      */
     private function getMethodParams($method, $module = null, $modelObject = null, &$autoMerged = false) {
         $params = array();
@@ -753,32 +757,73 @@ class ControllerApiDynamicAdmin extends ControllerApiBaseAdmin {
             $jsonInput = null;
         }
 
-        // Get direct URL parameters
+        // 🆕 PRIORITY: Check for form data or URL params FIRST
+        $formData = $this->getAllFormData();
         $urlParams = $this->extractDirectParams();
+
+        if (defined('DEBUG') && DEBUG) {
+            error_log("=== getMethodParams ===");
+            error_log("Form Data: " . json_encode($formData));
+            error_log("URL Params: " . json_encode($urlParams));
+            error_log("JSON Input: " . json_encode($jsonInput));
+        }
 
         // Detect method type
         $isEditMethod = preg_match('/(edit|update)/i', $method);
         $isAddMethod = preg_match('/(add|insert|create)/i', $method);
         $isGetMethod = preg_match('/(get|fetch|load|list)/i', $method);
+        $isDeleteMethod = preg_match('/(delete|remove)/i', $method);
 
-        // EDIT method with auto-merge
-        if ($isEditMethod) {
-            if ($jsonInput && !empty($jsonInput)) {
+        // ============ PRIORITY 1: Form Data ============
+        if (!empty($formData) && ($isEditMethod || $isAddMethod)) {
+            if (defined('DEBUG') && DEBUG) {
+                error_log("🎯 Using FORM DATA");
+            }
+
+            // For EDIT methods
+            if ($isEditMethod && !empty($urlParams)) {
+                $recordId = $urlParams[0];
+
+                // Check if partial
+                if ($this->isPartialEditData($formData, $method, $module)) {
+                    if ($modelObject) {
+                        $existingData = $this->getExistingData($modelObject, $method, $recordId);
+                        if ($existingData && is_array($existingData)) {
+                            // ✅ FIX: Restructure BOTH before merge
+                            $existingData = $this->ensureNestedStructure($existingData, $module);
+                            $formData = $this->ensureNestedStructure($formData, $module);  // ✅ اضافه شد
+
+                            $mergedData = $this->smartMerge($existingData, $formData);
+                            $autoMerged = true;
+
+                            if (defined('DEBUG') && DEBUG) {
+                                error_log("✅ FORM AUTO-MERGE successful");
+                                error_log("Final merged data keys: " . implode(', ', array_keys($mergedData)));
+                            }
+
+                            $params = array_merge($urlParams, array($mergedData));
+                            return $params;
+                        }
+                    }
+                }
+
+                $params = array_merge($urlParams, array($formData));
+                return $params;
+            }
+
+            // For ADD methods
+            $params = array($formData);
+            return $params;
+        }
+
+        // ============ PRIORITY 2: JSON Body ============
+        if (!empty($jsonInput) && ($isEditMethod || $isAddMethod)) {
+            if ($isEditMethod) {
                 $isPartialData = $this->isPartialEditData($jsonInput, $method, $module);
 
                 if ($isPartialData) {
-                    // Partial data - need auto-merge
-                    if (defined('DEBUG') && DEBUG) {
-                        error_log("🔄 PARTIAL DATA DETECTED - Starting Auto-Merge");
-                        error_log("Method: $method | Data: " . json_encode($jsonInput));
-                    }
-
                     if (empty($urlParams)) {
-                        throw new Exception(
-                            "Auto-Merge Error: ID parameter is missing. " .
-                            "For partial updates, you MUST provide the record ID in URL. " .
-                            "Example: &product_id=61"
-                        );
+                        throw new Exception("Auto-Merge Error: ID parameter missing. Example: &attribute_id=15");
                     }
 
                     if (!$modelObject) {
@@ -789,19 +834,21 @@ class ControllerApiDynamicAdmin extends ControllerApiBaseAdmin {
                     $existingData = $this->getExistingData($modelObject, $method, $recordId);
 
                     if ($existingData && is_array($existingData) && !empty($existingData)) {
+                        // ✅ FIX: Restructure BOTH
+                        $existingData = $this->ensureNestedStructure($existingData, $module);
+                        $jsonInput = $this->ensureNestedStructure($jsonInput, $module);  // ✅ اضافه شد
+
                         $mergedData = $this->smartMerge($existingData, $jsonInput);
                         $autoMerged = true;
 
                         if (defined('DEBUG') && DEBUG) {
-                            error_log("✅ AUTO-MERGE SUCCESSFUL! Changed fields: " . implode(', ', array_keys($jsonInput)));
+                            error_log("✅ JSON AUTO-MERGE successful");
+                            error_log("Final merged data keys: " . implode(', ', array_keys($mergedData)));
                         }
 
                         $params = array_merge($urlParams, array($mergedData));
                     } else {
-                        throw new Exception(
-                            "Auto-Merge Failed: Cannot retrieve existing data for ID: $recordId. " .
-                            "Possible causes: Record doesn't exist, Getter method not working, or Database issue."
-                        );
+                        throw new Exception("Auto-Merge Failed: Cannot retrieve data for ID: $recordId");
                     }
                 } else {
                     // Complete data
@@ -811,20 +858,18 @@ class ControllerApiDynamicAdmin extends ControllerApiBaseAdmin {
                         $params = array($jsonInput);
                     }
                 }
-            } else {
-                $params = $urlParams;
-            }
-        }
-        // ADD method
-        elseif ($isAddMethod) {
-            if ($jsonInput && !empty($jsonInput)) {
+            } elseif ($isAddMethod) {
                 $params = array($jsonInput);
-            } else {
-                $params = $urlParams;
             }
         }
-        // GET method
-        elseif ($isGetMethod) {
+
+
+        // ============ PRIORITY 3: URL Params Only ============
+        elseif (!empty($urlParams)) {
+            $params = $urlParams;
+        }
+        // ============ GET/DELETE Methods ============
+        elseif ($isGetMethod || $isDeleteMethod) {
             if ($jsonInput && isset($jsonInput['params']) && is_array($jsonInput['params'])) {
                 $params = $jsonInput['params'];
             } elseif (!empty($urlParams)) {
@@ -833,21 +878,262 @@ class ControllerApiDynamicAdmin extends ControllerApiBaseAdmin {
                 $params = array($jsonInput);
             }
         }
-        // Other methods
-        else {
-            if ($jsonInput) {
-                if (isset($jsonInput['params'])) {
-                    $params = is_array($jsonInput['params']) ? $jsonInput['params'] : array($jsonInput['params']);
-                } else {
-                    $params = array($jsonInput);
-                }
-            } elseif (!empty($urlParams)) {
-                $params = $urlParams;
-            }
-        }
 
         return $params;
     }
+
+    /**
+     * 🆕 Get ALL form data (POST/GET combined)
+     */
+    private function getAllFormData() {
+        $data = array();
+
+        // Get POST data
+        if (!empty($this->request->post)) {
+            $data = $this->request->post;
+        } elseif (!empty($_POST)) {
+            $data = $_POST;
+        }
+
+        // Merge with GET params (excluding reserved)
+        $reserved = array('route', 'module', 'method', 'api_key', 'user_token', 'token');
+        foreach ($this->request->get as $key => $value) {
+            if (!in_array($key, $reserved) && !isset($data[$key])) {
+                $data[$key] = $value;
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * 🔄 Ensure nested structure (با auto-detect از دیتابیس)
+     */
+    private function ensureNestedStructure($data, $module) {
+        // Map of modules to their nested key
+        $nestedMap = array(
+            'catalog/product' => 'product_description',
+            'catalog/category' => 'category_description',
+            'catalog/manufacturer' => 'manufacturer_description',
+            'catalog/information' => 'information_description',
+            'catalog/attribute' => 'attribute_description',
+            'catalog/attribute_group' => 'attribute_group_description',
+            'catalog/option' => 'option_description',
+            'catalog/option_value' => 'option_value_description',
+            'catalog/filter' => 'filter_description',
+            'catalog/filter_group' => 'filter_group_description',
+        );
+
+        if (!isset($nestedMap[$module])) {
+            return $data; // Unknown module
+        }
+
+        $nestedKey = $nestedMap[$module];
+
+        // Check if already nested
+        if (isset($data[$nestedKey]) && is_array($data[$nestedKey]) && !empty($data[$nestedKey])) {
+            return $this->verifyNestedFields($data, $module, $nestedKey);
+        }
+
+        // 🆕 Get language fields from DATABASE
+        $languageFields = $this->getLanguageFieldsFromDatabase($module);
+
+        // Check if data has flat language fields
+        $hasLangFields = false;
+        $foundFields = array();
+
+        foreach ($languageFields as $field) {
+            if (isset($data[$field])) {
+                $hasLangFields = true;
+                $foundFields[] = $field;
+            }
+        }
+
+        if (!$hasLangFields) {
+            return $data;
+        }
+
+        // Get language ID
+        $languageId = isset($data['language_id']) ? $data['language_id'] : $this->config->get('config_language_id');
+        if (empty($languageId)) {
+            $languageId = 2; // Default
+        }
+
+        // Build nested structure
+        $data[$nestedKey] = array();
+        $data[$nestedKey][$languageId] = array();
+
+        // Move fields to nested
+        foreach ($foundFields as $field) {
+            $data[$nestedKey][$languageId][$field] = $data[$field];
+        }
+
+        // Add missing fields with empty values
+        foreach ($languageFields as $field) {
+            if (!isset($data[$nestedKey][$languageId][$field])) {
+                $data[$nestedKey][$languageId][$field] = '';
+            }
+        }
+
+        if (defined('DEBUG') && DEBUG) {
+            error_log("✅ Restructured flat to nested: $nestedKey");
+            error_log("Moved fields: " . implode(', ', $foundFields));
+        }
+
+        return $data;
+    }
+
+
+    /**
+     * 🔍 Verify nested fields (با auto-detect از دیتابیس)
+     */
+    private function verifyNestedFields($data, $module, $nestedKey) {
+        // 🆕 Get required fields from DATABASE
+        $requiredFields = $this->getLanguageFieldsFromDatabase($module);
+
+        // Loop through all language IDs
+        foreach ($data[$nestedKey] as $languageId => &$fields) {
+            // Check for missing fields
+            foreach ($requiredFields as $field) {
+                if (!isset($fields[$field])) {
+                    // Try to get from top-level
+                    if (isset($data[$field])) {
+                        $fields[$field] = $data[$field];
+
+                        if (defined('DEBUG') && DEBUG) {
+                            error_log("✅ Moved $field from top-level to nested[$languageId]");
+                        }
+                    } else {
+                        // Add with empty value
+                        $fields[$field] = '';
+
+                        if (defined('DEBUG') && DEBUG) {
+                            error_log("⚠️ Added missing field $field to nested[$languageId] (empty)");
+                        }
+                    }
+                }
+            }
+        }
+        unset($fields); // Break reference
+
+        return $data;
+    }
+
+    /**
+     * 🗄️ Get language fields from database table structure
+     * 
+     * Automatically detects language-specific fields from database tables
+     * like oc_product_description, oc_category_description, etc.
+     * 
+     * @param string $module Module name (e.g., 'catalog/product')
+     * @return array List of language-specific field names
+     */
+    private function getLanguageFieldsFromDatabase($module) {
+        // Cache to avoid repeated queries
+        static $cache = array();
+
+        if (isset($cache[$module])) {
+            return $cache[$module];
+        }
+
+        // Map module to description table
+        $tableMap = array(
+            'catalog/product' => 'product_description',
+            'catalog/category' => 'category_description',
+            'catalog/manufacturer' => 'manufacturer_description',
+            'catalog/information' => 'information_description',
+            'catalog/attribute' => 'attribute_description',
+            'catalog/attribute_group' => 'attribute_group_description',
+            'catalog/option' => 'option_description',
+            'catalog/option_value' => 'option_value_description',
+            'catalog/filter' => 'filter_description',
+            'catalog/filter_group' => 'filter_group_description',
+            'catalog/download' => 'download_description',
+            'catalog/recurring' => 'recurring_description',
+            'sale/voucher_theme' => 'voucher_theme_description',
+        );
+
+        // Get table name
+        if (isset($tableMap[$module])) {
+            $tableName = $tableMap[$module];
+        } else {
+            // Auto-detect: catalog/product → product_description
+            $parts = explode('/', $module);
+            $tableName = end($parts) . '_description';
+        }
+
+        if (empty($tableName)) {
+            $cache[$module] = array();
+            return array();
+        }
+
+        $fullTableName = DB_PREFIX . $tableName;
+
+        try {
+            // Check if table exists
+            $checkQuery = $this->db->query("SHOW TABLES LIKE '" . $this->db->escape($fullTableName) . "'");
+
+            if ($checkQuery->num_rows == 0) {
+                if (defined('DEBUG') && DEBUG) {
+                    error_log("⚠️ Table $fullTableName does not exist");
+                }
+                $cache[$module] = array();
+                return array();
+            }
+
+            // Get table columns
+            $columnsQuery = $this->db->query("SHOW COLUMNS FROM `" . $fullTableName . "`");
+
+            $fields = array();
+
+            // ✅ FIXED: Only exclude actual primary key fields (not indexes)
+            $primaryKeys = array();
+            $excludeFields = array('language_id', 'store_id'); // Reserved fields
+
+            // First pass: Find PRIMARY keys
+            foreach ($columnsQuery->rows as $column) {
+                if ($column['Key'] === 'PRI') {
+                    $primaryKeys[] = $column['Field'];
+                }
+            }
+
+            if (defined('DEBUG') && DEBUG) {
+                error_log("Primary Keys: " . implode(', ', $primaryKeys));
+            }
+
+            // Second pass: Get all fields EXCEPT primary keys and reserved fields
+            foreach ($columnsQuery->rows as $column) {
+                $fieldName = $column['Field'];
+
+                // ✅ Skip ONLY primary keys and reserved fields
+                // ✅ DO NOT skip indexes (like 'name' which has Key='MUL')
+                if (in_array($fieldName, $primaryKeys) || in_array($fieldName, $excludeFields)) {
+                    continue;
+                }
+
+                $fields[] = $fieldName;
+            }
+
+            if (defined('DEBUG') && DEBUG) {
+                error_log("✅ Auto-detected " . count($fields) . " language fields from $fullTableName");
+                error_log("Fields: " . implode(', ', $fields));
+            }
+
+            $cache[$module] = $fields;
+            return $fields;
+
+        } catch (Exception $e) {
+            if (defined('DEBUG') && DEBUG) {
+                error_log("❌ Error detecting fields from $fullTableName: " . $e->getMessage());
+            }
+
+            // Fallback to common fields
+            $fallbackFields = array('name', 'description', 'meta_title', 'meta_description', 'meta_keyword');
+            $cache[$module] = $fallbackFields;
+            return $fallbackFields;
+        }
+    }
+
 
     /**
      * 🧠 Detect if data is partial (incomplete)
@@ -882,41 +1168,431 @@ class ControllerApiDynamicAdmin extends ControllerApiBaseAdmin {
     }
 
     /**
-     * 🔍 Get existing data (auto-detect getter method)
+     * 🔍 Get existing data (با استفاده خودکار از متدهای موجود در Model)
+     * 
+     * این متد:
+     * - خودکار متدهای get* را پیدا می‌کند
+     * - آن‌ها را فراخوانی می‌کند
+     * - داده‌ها را با کلیدهای صحیح (product_description, product_category, ...) ترکیب می‌کند
+     * 
+     * @param object $modelObject Model instance
+     * @param string $editMethod Edit method name (e.g., 'editProduct')
+     * @param int $id Record ID
+     * @return array Complete data with all related tables
      */
     private function getExistingData($modelObject, $editMethod, $id) {
-        // Possible getter methods
+        // Step 1: Try to find main getter method
         $possibleGetters = array(
-            preg_replace('/(edit|update)/i', 'get', $editMethod, 1),
+            preg_replace('/(edit|update)/i', 'get', $editMethod, 1),  // editProduct → getProduct
             preg_replace('/(edit|update)([A-Z]\w+)/i', 'get$2', $editMethod),
-            'get' . ucfirst($editMethod)
+            'get' . ucfirst(preg_replace('/(edit|update)/i', '', $editMethod))
         );
 
+        if (defined('DEBUG') && DEBUG) {
+            error_log("🔎 Auto-detecting getter methods for $editMethod with ID: $id");
+        }
+
+        $mainData = null;
+        $mainGetterMethod = null;
+
+        // Find main getter
         foreach ($possibleGetters as $getMethod) {
-            if (!method_exists($modelObject, $getMethod)) {
+            if (method_exists($modelObject, $getMethod)) {
+                try {
+                    $mainData = $modelObject->$getMethod($id);
+
+                    if ($mainData && is_array($mainData) && !empty($mainData)) {
+                        $mainGetterMethod = $getMethod;
+
+                        if (defined('DEBUG') && DEBUG) {
+                            error_log("✅ Main getter: $getMethod returned " . count($mainData) . " fields");
+                        }
+                        break;
+                    }
+                } catch (Exception $e) {
+                    continue;
+                }
+            }
+        }
+
+        if (!$mainData || !is_array($mainData)) {
+            if (defined('DEBUG') && DEBUG) {
+                error_log("❌ No main getter method found or empty data");
+            }
+            return null;
+        }
+
+        // Step 2: Auto-detect and call related getter methods
+        // Extract entity name from main getter (e.g., "getProduct" → "Product")
+        $entityName = preg_replace('/^get/', '', $mainGetterMethod);
+
+        if (defined('DEBUG') && DEBUG) {
+            error_log("🔍 Entity name: $entityName");
+            error_log("🔍 Looking for related methods like get{$entityName}* ...");
+        }
+
+        // Get all public methods from model
+        $reflection = new ReflectionClass($modelObject);
+        $allMethods = $reflection->getMethods(ReflectionMethod::IS_PUBLIC);
+
+        $relatedMethodsFound = 0;
+
+        foreach ($allMethods as $methodReflection) {
+            $methodName = $methodReflection->getName();
+
+            // Skip constructor, destructor, and main getter
+            if ($methodName === '__construct' || 
+                $methodName === '__destruct' || 
+                $methodName === $mainGetterMethod) {
+                continue;
+            }
+
+            // ✅ Pattern 1: get{Entity}{Something} (e.g., getProductCategories, getProductImages)
+            // ✅ Pattern 2: get{Entity}s (e.g., getProducts - but we skip this for list methods)
+            if (preg_match('/^get' . $entityName . '([A-Z]\w+)$/i', $methodName, $matches)) {
+                $suffix = $matches[1]; // e.g., "Categories", "Images", "Descriptions"
+
+                // Check method parameters
+                $params = $methodReflection->getParameters();
+
+                // Skip if method requires more than 1 parameter
+                if (count($params) > 1) {
+                    continue;
+                }
+
+                // Skip if method requires 0 parameters (likely a list method)
+                if (count($params) === 0) {
+                    continue;
+                }
+
+                // Check if first parameter name suggests it's for this entity
+                $firstParam = $params[0];
+                $paramName = $firstParam->getName();
+
+                // Expected parameter names
+                $expectedParamNames = [
+                    strtolower($entityName) . '_id',  // e.g., product_id
+                    $paramName === 'id',
+                    $paramName === strtolower($entityName) . '_id'
+                ];
+
+                if (!in_array(true, $expectedParamNames) && 
+                    !in_array($paramName, [strtolower($entityName) . '_id', 'id'])) {
+                    continue; // Skip if parameter name doesn't match
+                }
+
+                // Try to call the method
+                try {
+                    $relatedData = $modelObject->$methodName($id);
+
+                    if ($relatedData !== null && $relatedData !== false) {
+                        // ✅ PRIORITY 1: Auto-detect from add/edit code
+                        $keyName = $this->detectActualFieldName($modelObject, $methodName, $entityName);
+
+                        // ✅ FALLBACK: Use deriveKeyName if detection failed
+                        if (empty($keyName)) {
+                            $keyName = $this->deriveKeyName($entityName, $suffix);
+
+                            if (defined('DEBUG') && DEBUG) {
+                                error_log("⚠️ Auto-detection failed for $methodName, using fallback: $keyName");
+                            }
+                        }
+
+                        $mainData[$keyName] = $relatedData;
+                        $relatedMethodsFound++;
+
+                        if (defined('DEBUG') && DEBUG) {
+                            $count = is_array($relatedData) ? count($relatedData) : 'N/A';
+                            error_log("✅ Called $methodName → stored as '$keyName' ($count items)");
+                        }
+                    }
+
+                } catch (Exception $e) {
+                    if (defined('DEBUG') && DEBUG) {
+                        error_log("⚠️ $methodName failed: " . $e->getMessage());
+                    }
+                    continue;
+                }
+
+            }
+        }
+
+        if (defined('DEBUG') && DEBUG) {
+            error_log("✅ Auto-detection complete: Found $relatedMethodsFound related methods");
+            error_log("Total keys in data: " . count($mainData));
+        }
+
+        return $mainData;
+    }
+
+    /**
+     * 🔍 Detect actual field name from add/edit method code (Fully Automatic)
+     * 
+     * Scans addProduct/editProduct to find EXACT field name used in code
+     * Example: getProductImages() → finds 'product_image' (NOT 'image')
+     * 
+     * @param object $modelObject Model instance
+     * @param string $methodName Getter method name (e.g., 'getProductImages')
+     * @param string $entityName Entity name (e.g., 'Product')
+     * @return string|null Actual field name or null
+     */
+    private function detectActualFieldName($modelObject, $methodName, $entityName) {
+        // Cache to avoid repeated scans
+        static $cache = [];
+        $cacheKey = get_class($modelObject) . '_' . $methodName;
+
+        if (isset($cache[$cacheKey])) {
+            return $cache[$cacheKey];
+        }
+
+        // Target methods to scan
+        $targetMethods = [
+            'add' . $entityName,
+            'edit' . $entityName
+        ];
+
+        // Extract suffix from getter method name
+        // getProductImages → Images
+        // getProductTags → Tags
+        $suffix = preg_replace('/^get' . $entityName . '/i', '', $methodName);
+        $suffixLower = strtolower($suffix);
+
+        foreach ($targetMethods as $targetMethod) {
+            if (!method_exists($modelObject, $targetMethod)) {
                 continue;
             }
 
             try {
-                $data = $modelObject->$getMethod($id);
+                $reflection = new ReflectionMethod($modelObject, $targetMethod);
+                $filename = $reflection->getFileName();
+                $startLine = $reflection->getStartLine();
+                $endLine = $reflection->getEndLine();
 
-                if ($data === null || $data === false || (is_array($data) && empty($data))) {
-                    continue;
+                $source = file($filename);
+                $code = implode("", array_slice($source, $startLine - 1, $endLine - $startLine + 1));
+
+                // ✅ Find all $data['xxx'] patterns
+                if (preg_match_all("/\\\$data\['([^']+)'\]/", $code, $matches)) {
+                    $candidateFields = array_unique($matches[1]);
+
+                    // ✅ PRIORITY 1: Find field that contains suffix
+                    // and starts with entity name
+                    foreach ($candidateFields as $fieldName) {
+                        $fieldLower = strtolower($fieldName);
+
+                        // Match criteria:
+                        // 1. Field starts with entity name (product_xxx)
+                        // 2. Field contains the suffix (getProductImages → image)
+                        $entityPrefix = strtolower($entityName) . '_';
+
+                        if (strpos($fieldLower, $entityPrefix) === 0) {
+                            $fieldSuffix = substr($fieldLower, strlen($entityPrefix));
+
+                            // Check if suffix matches (with or without 's')
+                            // getProductImages → product_image (match!)
+                            // getProductTags → product_tagn (match!)
+                            if ($this->suffixMatches($suffixLower, $fieldSuffix)) {
+                                if (defined('DEBUG') && DEBUG) {
+                                    error_log("🎯 Auto-detected field: $methodName → $fieldName");
+                                }
+                                $cache[$cacheKey] = $fieldName;
+                                return $fieldName;
+                            }
+                        }
+                    }
                 }
-
-                if (defined('DEBUG') && DEBUG) {
-                    error_log("✅ $getMethod returned valid data with " . count($data) . " fields");
-                }
-
-                return $data;
 
             } catch (Exception $e) {
+                if (defined('DEBUG') && DEBUG) {
+                    error_log("Failed to scan $targetMethod: " . $e->getMessage());
+                }
                 continue;
             }
         }
 
-        return null;
+        // ✅ FALLBACK: Use simple rule
+        $fallbackName = strtolower($entityName) . '_' . $this->applySimpleSingularRules($suffixLower);
+
+        if (defined('DEBUG') && DEBUG) {
+            error_log("⚠️ Auto-detection failed for $methodName, using fallback: $fallbackName");
+        }
+
+        $cache[$cacheKey] = $fallbackName;
+        return $fallbackName;
     }
+
+    /**
+     * ✅ Check if suffix matches field suffix (با normalization)
+     * 
+     * Examples:
+     * - suffixMatches('images', 'image') → true
+     * - suffixMatches('seourls', 'seo_url') → true ✅ FIXED!
+     * - suffixMatches('tags', 'tagn') → true
+     * - suffixMatches('categories', 'category') → true
+     * 
+     * @param string $methodSuffix Suffix from method name (e.g., 'seourls')
+     * @param string $fieldSuffix Suffix from field name (e.g., 'seo_url')
+     * @return bool
+     */
+    private function suffixMatches($methodSuffix, $fieldSuffix) {
+        // ✅ Normalize: Remove underscores for comparison
+        // This handles cases like:
+        // - seourls vs seo_url
+        // - customtext vs custom_text
+        $normalizedMethod = str_replace('_', '', strtolower($methodSuffix));
+        $normalizedField = str_replace('_', '', strtolower($fieldSuffix));
+        
+        // Exact match (normalized)
+        if ($normalizedMethod === $normalizedField) {
+            return true;
+        }
+        
+        // Method suffix without 's' matches field
+        // seourls → seourl === seourl (from seo_url) ✅
+        if (rtrim($normalizedMethod, 's') === $normalizedField) {
+            return true;
+        }
+        
+        // Method suffix contains field suffix
+        // tags → tagn
+        if (strpos($normalizedMethod, $normalizedField) !== false) {
+            return true;
+        }
+        
+        // Field suffix contains method suffix (without 's')
+        // images → image
+        if (strpos($normalizedField, rtrim($normalizedMethod, 's')) !== false) {
+            return true;
+        }
+        
+        // Handle 'ies' → 'y'
+        // categories → category
+        if (substr($normalizedMethod, -3) === 'ies') {
+            $singularForm = substr($normalizedMethod, 0, -3) . 'y';
+            if ($singularForm === $normalizedField) {
+                return true;
+            }
+        }
+        
+        return false;
+    }   
+
+    /**
+     * 🔤 Apply simple singular rules (Fallback only)
+     * 
+     * این فقط برای fallback استفاده می‌شود - معمولاً از code detection استفاده می‌کنیم
+     * 
+     * @param string $word Plural word
+     * @return string Singular form
+     */
+    private function applySimpleSingularRules($word) {
+        // Handle 'ies' → 'y'
+        if (substr($word, -3) === 'ies') {
+            return substr($word, 0, -3) . 'y';  // categories → category
+        }
+
+        // Handle 'es' → '' (for some words)
+        if (substr($word, -2) === 'es' && in_array(substr($word, -3, 1), ['s', 'x', 'z', 'h'])) {
+            return substr($word, 0, -2);  // boxes → box, wishes → wish
+        }
+
+        // Handle 's' → ''
+        if (substr($word, -1) === 's') {
+            return substr($word, 0, -1);  // images → image
+        }
+
+        return $word;
+    }
+
+
+    /**
+     * 🔤 Derive key name from entity and suffix (با singular mapping)
+     * 
+     * Examples:
+     * - deriveKeyName('Product', 'Categories') → 'product_category'
+     * - deriveKeyName('Product', 'Descriptions') → 'product_description'
+     * - deriveKeyName('Product', 'Images') → 'product_image'
+     * 
+     * @param string $entity Entity name (e.g., 'Product')
+     * @param string $suffix Method suffix (e.g., 'Categories')
+     * @return string Derived key name
+     */
+    private function deriveKeyName($entity, $suffix) {
+        // Convert to lowercase
+        $entity = strtolower($entity);
+        $suffix = strtolower($suffix);
+
+        // ✅ Singular mapping for common plurals (OpenCart standard)
+        $pluralToSingular = array(
+            'categories' => 'category',
+            'images' => 'image',
+            'descriptions' => 'description',
+            'attributes' => 'attribute',
+            'options' => 'option',
+            'values' => 'value',
+            'discounts' => 'discount',
+            'specials' => 'special',
+            'filters' => 'filter',
+            'rewards' => 'reward',
+            'downloads' => 'download',
+            'stores' => 'store',
+            'seourls' => 'seo_url',
+            'layouts' => 'layout',
+            'affiliates' => 'affiliate',
+            'customtext' => 'customtext',
+            'customtexts' => 'customtext',
+            'tags' => 'tag',
+            'tagn' => 'tagn',
+            'tagns' => 'tagn',
+            'recurrings' => 'recurring',
+            'transactions' => 'transaction',
+            'histories' => 'history',
+            'addresses' => 'address',
+            'activities' => 'activity',
+            'approvals' => 'approval',
+            'searches' => 'search',
+            'wishlists' => 'wishlist',
+            'ips' => 'ip',
+            'logins' => 'login',
+            'sessions' => 'session',
+            'totals' => 'total',
+            'vouchers' => 'voucher',
+            'returns' => 'return',
+            'statuses' => 'status',
+            'reasons' => 'reason',
+            'actions' => 'action'
+        );
+
+        // Check if suffix has direct mapping
+        if (isset($pluralToSingular[$suffix])) {
+            return $entity . '_' . $pluralToSingular[$suffix];
+        }
+
+        // ✅ Fallback: Simple 's' removal for regular plurals
+        // (e.g., 'Products' → 'Product')
+        $singularSuffix = preg_replace('/s$/', '', $suffix);
+
+        // ✅ Handle 'ies' → 'y' (e.g., 'Accessories' → 'Accessory')
+        $singularSuffix = preg_replace('/ies$/', 'y', $singularSuffix);
+
+        // Special case mappings for compound names
+        $specialMappings = array(
+            'seo_url' => 'seo_url',
+            'seourl' => 'seo_url',
+            'customtext' => 'customtext',
+            'affiliate' => 'affiliate'
+        );
+
+        if (isset($specialMappings[$singularSuffix])) {
+            return $entity . '_' . $specialMappings[$singularSuffix];
+        }
+
+        // Default: entity_suffix
+        return $entity . '_' . $singularSuffix;
+    }
+
+
+
 
     /**
      * 🧩 Smart merge arrays (recursive)
@@ -956,14 +1632,43 @@ class ControllerApiDynamicAdmin extends ControllerApiBaseAdmin {
         return $params;
     }
 
+
     /**
-     * ⚙️ Execute method with error handling
+     * ⚙️ Execute method with enhanced error handling
      */
     private function executeMethod($object, $method, $params) {
         try {
             set_error_handler(array($this, 'errorHandler'));
             
-            if (is_array($params) && !empty($params)) {
+            // ✅ Check if method exists
+            if (!method_exists($object, $method)) {
+                throw new Exception("Method '$method' does not exist");
+            }
+    
+            // ✅ Get method reflection to check parameters
+            $reflection = new ReflectionMethod($object, $method);
+            $requiredParamsCount = $reflection->getNumberOfRequiredParameters();
+            $totalParamsCount = $reflection->getNumberOfParameters();
+    
+            // ✅ Validate parameter count
+            if (count($params) < $requiredParamsCount) {
+                throw new Exception(
+                    "Method '$method' requires at least $requiredParamsCount parameter(s), " .
+                    "but " . count($params) . " provided. " .
+                    "Add missing parameters or use GET to see method details."
+                );
+            }
+    
+            if (count($params) > $totalParamsCount) {
+                // ⚠️ Trim extra parameters (but don't throw error)
+                if (defined('DEBUG') && DEBUG) {
+                    error_log("Warning: Extra parameters provided to $method - trimming to $totalParamsCount");
+                }
+                $params = array_slice($params, 0, $totalParamsCount);
+            }
+            
+            // Execute method
+            if (!empty($params)) {
                 $result = call_user_func_array(array($object, $method), $params);
             } else {
                 $result = $object->$method();
@@ -978,6 +1683,7 @@ class ControllerApiDynamicAdmin extends ControllerApiBaseAdmin {
             throw $e;
         }
     }
+    
 
     /**
      * 🚨 Error handler - convert warnings to exceptions
