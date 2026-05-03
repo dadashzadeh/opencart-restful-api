@@ -1,4 +1,4 @@
-# OpenCart Dynamic API & Swagger Documentation
+## OpenCart Dynamic API & Swagger Documentation
 
 **OpenCart Dynamic API** is a powerful extension that instantly transforms your OpenCart store into a fully RESTful API. It automatically discovers and exposes all Models and Controllers from both the **Catalog** (Frontend) and **Admin** (Backend) sides, without requiring any manual route definition.
 
