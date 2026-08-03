@@ -251,6 +251,11 @@ class ControllerApiBaseAdmin extends Controller {
             return true;  // ✅ YOU HAVE VQMod INSTALLED
         }
         
+        // Define $rootPath before it is used
+        $rootPath = $this->isOC4() ? 
+                   (defined('DIR_OPENCART') ? DIR_OPENCART : dirname(dirname(DIR_APPLICATION))) :
+                   dirname(DIR_APPLICATION);
+        
         // Method 2: vqmod.php file exists
         $vqmodFile = $rootPath . '/vqmod/vqmod.php';
         if (file_exists($vqmodFile)) {
