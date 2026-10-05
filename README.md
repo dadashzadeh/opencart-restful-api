@@ -1,26 +1,71 @@
 ## OpenCart Dynamic API & Swagger Documentation
 
-**OpenCart Dynamic API** is a powerful extension that instantly transforms your OpenCart store into a fully RESTful API. It automatically discovers and exposes all Models and Controllers from both the **Catalog** (Frontend) and **Admin** (Backend) sides, without requiring any manual route definition.
+OpenCart Dynamic API is a powerful extension that instantly transforms your OpenCart store
+into a fully RESTful API. It automatically discovers and exposes all Models and Controllers
+from both the Catalog (Frontend) and Admin (Backend) sides, without requiring any manual
+route definition.
 
-It comes with a built-in **Swagger/OpenAPI** generator that creates live documentation for your specific OpenCart installation.
+It comes with a built-in Swagger/OpenAPI generator and an interactive documentation
+interface for exploring, testing, and integrating with your store's API.
 
 ## 🚀 Features
 
-- **Dynamic Access**: Call *any* public method from *any* Model or Controller (Admin & Catalog).
-- **Auto-Discovery**: Automatically scans your OpenCart installation to list available modules.
-- **Swagger UI**: Auto-generated OpenAPI 3.0 documentation (JSON/YAML).
-- **Smart Inspection**: Analyze methods, parameters, and required fields before calling them.
-- **Admin Access from Frontend**: Execute Admin actions via the Frontend API (secured by API Key).
-- **Partial Updates**: Smart "edit" methods support partial JSON data with auto-merging.
-- **Modification Support**: Fully compatible with **VQMod** and **OCMOD**.
-- **Multi-Version Support**: Works with OpenCart 2.x, 3.x, and 4.x.
-- **Dependency Handling**: Automatically loads required model dependencies.
+[1] Dynamic Access
+Call any public method from any Model or Controller on both the Admin and Catalog sides.
+No hardcoded endpoints — everything is discovered automatically.
+
+[2] Auto-Discovery
+Automatically scans your OpenCart installation and lists all available modules,
+methods, parameters, and return types.
+
+[3] Swagger / OpenAPI 3.0
+Auto-generated OpenAPI specification available in both JSON and YAML formats.
+Includes a built-in Swagger UI for interactive exploration.
+
+[4] Interactive Documentation
+A beautiful, built-in documentation page (docs.html) with:
+- Search and filter capabilities
+- "Try It Out" functionality for every endpoint
+- JSON syntax highlighting
+- Response time tracking
+- One-click response copying
+
+[5] Smart Method Inspection
+Analyze any method before calling it. The API returns:
+- Required and optional parameters
+- Detected database fields
+- Validation rules
+- Example JSON request body
+- Source file location and modification status
+
+[6] Partial Updates (Auto-Merge)
+For edit/update methods, send only the fields you want to change.
+The extension automatically:
+- Detects the record ID from the URL
+- Fetches existing data using the corresponding getter method
+- Merges your changes with the existing data
+- Passes the complete merged data to the edit method
+
+[7] Admin Access from Frontend
+Execute Admin-side model and controller methods through the Frontend API,
+fully secured by API Key authentication.
+
+[8] VQMod & OCMOD Support
+Automatically detects your modification system and loads the correct
+(modified) files. Searches in this priority order:
+1. VQMod Cache (vqmod/vqcache/)
+2. OCMOD Storage (system/storage/modification/)
+3. Original Directory
+
+[9] Automatic Dependency Loading
+When a model depends on other models, the extension automatically detects
+and loads all required dependencies before execution.
 
 ---
 
 ## 📋 Requirements
 
-- OpenCart 2.0.x - 4.x
+- OpenCart 2.0.x
 - PHP 5.6 or higher
 - VQMod (optional, but supported)
 
